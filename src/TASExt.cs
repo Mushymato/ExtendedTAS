@@ -5,9 +5,13 @@ using StardewModdingAPI.Events;
 using StardewValley;
 using StardewValley.Delegates;
 using StardewValley.GameData;
+using TrinketTinker;
 
 namespace Mushymato.ExtendedTAS;
 
+/// <summary>
+/// Randomizing model, used to define upper and lower bounds of randomness on TAS creation.
+/// </summary>
 public sealed class TASExtRand
 {
     public float SortOffset = 0f;
@@ -26,6 +30,9 @@ public sealed class TASExtRand
     public int SpawnDelay = 0;
 }
 
+/// <summary>
+/// Extends vanilla TemporaryAnimatedSpriteDefinition with more fields + random model
+/// </summary>
 public sealed class TASExt : TemporaryAnimatedSpriteDefinition
 {
     public float ScaleChangeChange = 0f;
@@ -45,6 +52,10 @@ public sealed class TASExt : TemporaryAnimatedSpriteDefinition
     public TASExtRand? RandMax = null;
 }
 
+/// <summary>
+/// A context used to spawn TAS with, holds some overwriting values.
+/// </summary>
+/// <param name="Def"></param>
 internal sealed record TASContext(TASExt Def)
 {
     private TimeSpan spawnTimeout = TimeSpan.Zero;
@@ -53,24 +64,29 @@ internal sealed record TASContext(TASExt Def)
     internal Vector2 PosOffsetMin = Vector2.Zero;
     internal Vector2 PosOffsetMax = Vector2.Zero;
 
+    internal int? OverrideLoops = null;
+    internal float? OverrideDrawLayer = null;
+    internal float? OverrideRotation = null;
+
     // csharpier-ignore
     internal TemporaryAnimatedSprite Create()
     {
+
         TemporaryAnimatedSprite tas = TemporaryAnimatedSprite.GetTemporaryAnimatedSprite(
             Def.Texture,
             Def.SourceRect,
             Def.Interval,
             Def.Frames,
-            Def.Loops,
+            OverrideLoops ?? Def.Loops,
             Pos + Random.Shared.NextVector2(PosOffsetMin, PosOffsetMax) + (Def.PositionOffset + (Def.HasRand ? Random.Shared.NextVector2(Def.RandMin!.PositionOffset, Def.RandMax!.PositionOffset) : Vector2.Zero)) * 4f,
             Def.Flicker,
             Def.Flip,
-            Def.SortOffset + (Def.HasRand ? Random.Shared.NextSingle(Def.RandMin!.SortOffset, Def.RandMax!.SortOffset) : 0),
+            (OverrideDrawLayer ?? Def.SortOffset) + (Def.HasRand ? Random.Shared.NextSingle(Def.RandMin!.SortOffset, Def.RandMax!.SortOffset) : 0),
             Def.AlphaFade + (Def.HasRand ? Random.Shared.NextSingle(Def.RandMin!.AlphaFade, Def.RandMax!.AlphaFade) : 0),
             Utility.StringToColor(Def.Color) ?? Color.White,
             (Def.Scale + (Def.HasRand ? Random.Shared.NextSingle(Def.RandMin!.Scale, Def.RandMax!.Scale) : 0)) * 4f,
             Def.ScaleChange + (Def.HasRand ? Random.Shared.NextSingle(Def.RandMin!.ScaleChange, Def.RandMax!.ScaleChange) : 0),
-            Def.Rotation + (Def.HasRand ? Random.Shared.NextSingle(Def.RandMin!.Rotation, Def.RandMax!.Rotation) : 0),
+            (OverrideRotation ?? Def.Rotation) + (Def.HasRand ? Random.Shared.NextSingle(Def.RandMin!.Rotation, Def.RandMax!.Rotation) : 0),
             Def.RotationChange + (Def.HasRand ? Random.Shared.NextSingle(Def.RandMin!.RotationChange, Def.RandMax!.RotationChange) : 0)
         );
         tas.scaleChangeChange = Def.HasRand ? Random.Shared.NextSingle(Def.RandMin!.ScaleChangeChange, Def.RandMax!.ScaleChangeChange) : 0;
@@ -136,9 +152,14 @@ internal sealed record TASContext(TASExt Def)
     }
 }
 
+/// <summary>
+/// Manages the TAS custom asset.
+/// Even though multiple mod uses this, they must have their own asset name.
+/// </summary>
 internal sealed class TASAssetManager
 {
     private readonly string assetName;
+    internal string AssetName => assetName;
     internal TASAssetManager(IModHelper helper, string assetName)
     {
         helper.Events.Content.AssetRequested += OnAssetRequested;
@@ -170,14 +191,24 @@ internal sealed class TASAssetManager
 
     public bool TryGetTASExt(string tasId, [NotNullWhen(true)] out TASExt? tasExt)
     {
-        return TASData.TryGetValue(tasId, out tasExt);
+        if (TASData.TryGetValue(tasId, out tasExt))
+        {
+            if (tasExt.Frames <= 0 || tasExt.Interval <= 0)
+            {
+                ModEntry.LogOnce($"'{tasId}' has invalid duration (frames:{tasExt.Frames}|interval:{tasExt.Interval})");
+                tasExt = null;
+                return false;
+            }
+            return true;
+        }
+        return false;
     }
 
     public IEnumerable<TASExt> GetTASExtList(IEnumerable<string> tasIds)
     {
         foreach (string tasId in tasIds)
         {
-            if (TASData.TryGetValue(tasId, out TASExt? tasExt))
+            if (TryGetTASExt(tasId, out TASExt? tasExt))
             {
                 yield return tasExt;
             }
