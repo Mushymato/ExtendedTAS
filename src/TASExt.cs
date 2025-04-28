@@ -158,11 +158,13 @@ internal sealed record TASContext(TASExt Def)
 internal sealed class TASAssetManager
 {
     private readonly string assetName;
+    private readonly IModHelper helper;
     internal string AssetName => assetName;
     internal TASAssetManager(IModHelper helper, string assetName)
     {
-        helper.Events.Content.AssetRequested += OnAssetRequested;
-        helper.Events.Content.AssetsInvalidated += OnAssetInvalidated;
+        this.helper = helper;
+        this.helper.Events.Content.AssetRequested += OnAssetRequested;
+        this.helper.Events.Content.AssetsInvalidated += OnAssetInvalidated;
         this.assetName = assetName;
     }
 
@@ -171,7 +173,7 @@ internal sealed class TASAssetManager
     {
         get
         {
-            _tasData ??= Game1.content.Load<Dictionary<string, TASExt>>(assetName);
+            _tasData ??= helper.GameContent.Load<Dictionary<string, TASExt>>(assetName);
             return _tasData;
         }
     }
