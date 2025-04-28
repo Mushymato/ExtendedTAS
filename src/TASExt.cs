@@ -5,7 +5,6 @@ using StardewModdingAPI.Events;
 using StardewValley;
 using StardewValley.Delegates;
 using StardewValley.GameData;
-using TrinketTinker;
 
 namespace Mushymato.ExtendedTAS;
 
@@ -195,7 +194,6 @@ internal sealed class TASAssetManager
         {
             if (tasExt.Frames <= 0 || tasExt.Interval <= 0)
             {
-                ModEntry.LogOnce($"'{tasId}' has invalid duration (frames:{tasExt.Frames}|interval:{tasExt.Interval})");
                 tasExt = null;
                 return false;
             }
