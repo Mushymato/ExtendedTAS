@@ -67,6 +67,8 @@ internal sealed record TASContext(TASExt Def)
     internal float? OverrideDrawLayer = null;
     internal float? OverrideRotation = null;
 
+    internal HashSet<TemporaryAnimatedSprite> Spawned = [];
+
     // csharpier-ignore
     internal TemporaryAnimatedSprite Create()
     {
@@ -115,7 +117,12 @@ internal sealed record TASContext(TASExt Def)
         {
             // DelayedAction.addTemporarySpriteAfterDelay(tas, location, Def.SpawnDelay + (Def.HasRand ? Random.Shared.Next(Def.RandMin!.SpawnDelay, Def.RandMax!.SpawnDelay) : 0), true);
             DelayedAction.functionAfterDelay(
-                () => addSprite(tas),
+                () =>
+                {
+                    tas.endFunction = (extraInfo) => Spawned.Remove(tas);
+                    Spawned.Add(tas);
+                    addSprite(tas);
+                },
                 Def.SpawnDelay
                     + (Def.HasRand ? Random.Shared.Next(Def.RandMin!.SpawnDelay, Def.RandMax!.SpawnDelay) : 0)
             );
@@ -142,12 +149,22 @@ internal sealed record TASContext(TASExt Def)
             );
             if (TryCreate(context, out TemporaryAnimatedSprite? tas))
             {
+                tas.endFunction = (extraInfo) => Spawned.Remove(tas);
+                Spawned.Add(tas);
                 addSprite(tas);
                 return true;
             }
         }
         spawnTimeout -= time.ElapsedGameTime;
         return false;
+    }
+
+    internal void RemoveAllSpawned(Func<TemporaryAnimatedSprite, bool> removeSprite)
+    {
+        foreach (TemporaryAnimatedSprite tas in Spawned)
+        {
+            removeSprite(tas);
+        }
     }
 }
 
