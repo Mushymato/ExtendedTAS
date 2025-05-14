@@ -69,6 +69,8 @@ internal sealed record TASContext(TASExt Def)
 
     internal HashSet<TemporaryAnimatedSprite> Spawned = [];
 
+    internal bool? GSQState = null;
+
     // csharpier-ignore
     internal TemporaryAnimatedSprite Create()
     {
@@ -102,7 +104,7 @@ internal sealed record TASContext(TASExt Def)
 
     internal bool TryCreate(GameStateQueryContext context, [NotNullWhen(true)] out TemporaryAnimatedSprite? tas)
     {
-        if (GameStateQuery.CheckConditions(Def.Condition, context))
+        if (GSQState ??= (GameStateQuery.CheckConditions(Def.Condition, context)))
         {
             tas = Create();
             return true;
