@@ -74,7 +74,6 @@ internal sealed record TASContext(TASExt Def)
     // csharpier-ignore
     internal TemporaryAnimatedSprite Create()
     {
-
         TemporaryAnimatedSprite tas = TemporaryAnimatedSprite.GetTemporaryAnimatedSprite(
             Def.Texture,
             Def.SourceRect,
@@ -102,7 +101,7 @@ internal sealed record TASContext(TASExt Def)
         return tas;
     }
 
-    internal bool TryCreate(GameStateQueryContext context, [NotNullWhen(true)] out TemporaryAnimatedSprite? tas)
+    private bool TryCreateConditionally(GameStateQueryContext context, [NotNullWhen(true)] out TemporaryAnimatedSprite? tas)
     {
         if (GSQState ??= (GameStateQuery.CheckConditions(Def.Condition, context)))
         {
@@ -113,11 +112,21 @@ internal sealed record TASContext(TASExt Def)
         return false;
     }
 
+
+    internal bool TryCreate(GameStateQueryContext context, Action<TemporaryAnimatedSprite> addSprite)
+    {
+        if (TryCreateConditionally(context, out TemporaryAnimatedSprite? tas))
+        {
+            addSprite(tas);
+            return true;
+        }
+        return false;
+    }
+
     internal bool TryCreateDelayed(GameStateQueryContext context, Action<TemporaryAnimatedSprite> addSprite)
     {
-        if (TryCreate(context, out TemporaryAnimatedSprite? tas) && Def.SpawnDelay > 0)
+        if (Def.SpawnDelay > 0 && TryCreateConditionally(context, out TemporaryAnimatedSprite? tas))
         {
-            // DelayedAction.addTemporarySpriteAfterDelay(tas, location, Def.SpawnDelay + (Def.HasRand ? Random.Shared.Next(Def.RandMin!.SpawnDelay, Def.RandMax!.SpawnDelay) : 0), true);
             DelayedAction.functionAfterDelay(
                 () =>
                 {
@@ -149,7 +158,7 @@ internal sealed record TASContext(TASExt Def)
                             : 0
                     )
             );
-            if (TryCreate(context, out TemporaryAnimatedSprite? tas))
+            if (TryCreateConditionally(context, out TemporaryAnimatedSprite? tas))
             {
                 tas.endFunction = (extraInfo) => Spawned.Remove(tas);
                 Spawned.Add(tas);
@@ -167,6 +176,7 @@ internal sealed record TASContext(TASExt Def)
         {
             removeSprite(tas);
         }
+        Spawned.Clear();
     }
 }
 
