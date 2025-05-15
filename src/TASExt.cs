@@ -58,6 +58,7 @@ public sealed class TASExt : TemporaryAnimatedSpriteDefinition
 internal sealed record TASContext(TASExt Def)
 {
     private TimeSpan spawnTimeout = TimeSpan.Zero;
+    private TimeSpan gsqTimeout = TimeSpan.Zero;
     internal Vector2 Pos = Vector2.Zero;
 
     internal Vector2 PosOffsetMin = Vector2.Zero;
@@ -158,6 +159,11 @@ internal sealed record TASContext(TASExt Def)
                             : 0
                     )
             );
+            if (gsqTimeout <= TimeSpan.Zero)
+            {
+                gsqTimeout = TimeSpan.FromSeconds(1);
+                GSQState = null;
+            }
             if (TryCreateConditionally(context, out TemporaryAnimatedSprite? tas))
             {
                 tas.endFunction = (extraInfo) => Spawned.Remove(tas);
@@ -166,6 +172,7 @@ internal sealed record TASContext(TASExt Def)
                 return true;
             }
         }
+        gsqTimeout -= time.ElapsedGameTime;
         spawnTimeout -= time.ElapsedGameTime;
         return false;
     }
