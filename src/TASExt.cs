@@ -57,6 +57,7 @@ public sealed class TASExt : TemporaryAnimatedSpriteDefinition
 /// <param name="Def"></param>
 internal sealed record TASContext(TASExt Def)
 {
+    private bool notSpawnedYet = true;
     private TimeSpan spawnTimeout = TimeSpan.Zero;
     private TimeSpan gsqTimeout = TimeSpan.Zero;
     internal Vector2 Pos = Vector2.Zero;
@@ -151,29 +152,41 @@ internal sealed record TASContext(TASExt Def)
     {
         if (spawnTimeout <= TimeSpan.Zero)
         {
-            spawnTimeout = TimeSpan.FromMilliseconds(
+            if (notSpawnedYet)
+            {
+                spawnTimeout = TimeSpan.FromMilliseconds(Def.SpawnDelay
+                    + (Def.HasRand ? Random.Shared.Next(Def.RandMin!.SpawnDelay, Def.RandMax!.SpawnDelay) : 0));
+                notSpawnedYet = false;
+            }
+            else
+            {
+                spawnTimeout = TimeSpan.FromMilliseconds(
                 Def.SpawnInterval
                     + (
                         Def.HasRand
                             ? Random.Shared.NextDouble(Def.RandMin!.SpawnInterval, Def.RandMax!.SpawnInterval)
                             : 0
                     )
-            );
-            if (gsqTimeout <= TimeSpan.Zero)
-            {
-                gsqTimeout = TimeSpan.FromSeconds(1);
-                GSQState = null;
-            }
-            if (TryCreateConditionally(context, out TemporaryAnimatedSprite? tas))
-            {
-                tas.endFunction = (extraInfo) => Spawned.Remove(tas);
-                Spawned.Add(tas);
-                addSprite(tas);
-                return true;
+                );
+                if (gsqTimeout <= TimeSpan.Zero)
+                {
+                    gsqTimeout = TimeSpan.FromSeconds(1);
+                    GSQState = null;
+                }
+                if (TryCreateConditionally(context, out TemporaryAnimatedSprite? tas))
+                {
+                    tas.endFunction = (extraInfo) => Spawned.Remove(tas);
+                    Spawned.Add(tas);
+                    addSprite(tas);
+                    return true;
+                }
             }
         }
-        gsqTimeout -= time.ElapsedGameTime;
-        spawnTimeout -= time.ElapsedGameTime;
+        else
+        {
+            gsqTimeout -= time.ElapsedGameTime;
+            spawnTimeout -= time.ElapsedGameTime;
+        }
         return false;
     }
 
