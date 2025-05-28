@@ -46,6 +46,8 @@ public sealed class TASExt : TemporaryAnimatedSpriteDefinition
     public double SpawnInterval = -1;
     public int SpawnDelay = -1;
 
+    public double ConditionInterval = -1;
+
     internal bool HasRand => RandMin != null && RandMax != null;
     public TASExtRand? RandMin = null;
     public TASExtRand? RandMax = null;
@@ -168,9 +170,9 @@ internal sealed record TASContext(TASExt Def)
                             : 0
                     )
                 );
-                if (gsqTimeout <= TimeSpan.Zero)
+                if (Def.ConditionInterval > 0 && GSQState != null && gsqTimeout <= TimeSpan.Zero)
                 {
-                    gsqTimeout = TimeSpan.FromSeconds(1);
+                    gsqTimeout = TimeSpan.FromMilliseconds(Def.ConditionInterval);
                     GSQState = null;
                 }
                 if (TryCreateConditionally(context, out TemporaryAnimatedSprite? tas))
@@ -184,7 +186,8 @@ internal sealed record TASContext(TASExt Def)
         }
         else
         {
-            gsqTimeout -= time.ElapsedGameTime;
+            if (gsqTimeout > TimeSpan.Zero)
+                gsqTimeout -= time.ElapsedGameTime;
             spawnTimeout -= time.ElapsedGameTime;
         }
         return false;
