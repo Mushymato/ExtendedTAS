@@ -121,6 +121,8 @@ internal sealed record TASContext(TASExt Def)
     {
         if (TryCreateConditionally(context, out TemporaryAnimatedSprite? tas))
         {
+            tas.endFunction = (extraInfo) => Spawned.Remove(tas);
+            Spawned.Add(tas);
             addSprite(tas);
             return true;
         }
