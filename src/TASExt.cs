@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.Xna.Framework;
+using MiscMapActionsProperties;
 using StardewModdingAPI;
 using StardewModdingAPI.Events;
 using StardewValley;
@@ -59,6 +60,8 @@ public sealed class TASExt : TemporaryAnimatedSpriteDefinition
 /// <param name="Def"></param>
 internal sealed record TASContext(TASExt Def)
 {
+    internal const float LAYER_OFFSET = 2E-06f;
+
     private bool notSpawnedYet = true;
     private TimeSpan spawnTimeout = TimeSpan.Zero;
     private TimeSpan gsqTimeout = TimeSpan.Zero;
@@ -75,6 +78,15 @@ internal sealed record TASContext(TASExt Def)
 
     internal bool? GSQState = null;
 
+    internal float GetDrawLayerDepth()
+    {
+        float layerDepth = OverrideDrawLayer ?? Def.LayerDepth ?? 0f;
+        float SortOffset = Def.SortOffset + (Def.HasRand ? Random.Shared.NextSingle(Def.RandMin!.SortOffset, Def.RandMax!.SortOffset) : 0);
+        if (SortOffset > 0)
+            layerDepth += (Pos.Y + SortOffset) / 10000f + Pos.X / Game1.tileSize * LAYER_OFFSET;
+        return layerDepth;
+    }
+
     // csharpier-ignore
     internal TemporaryAnimatedSprite Create()
     {
@@ -87,7 +99,7 @@ internal sealed record TASContext(TASExt Def)
             Pos + Random.Shared.NextVector2(PosOffsetMin, PosOffsetMax) + (Def.PositionOffset + (Def.HasRand ? Random.Shared.NextVector2(Def.RandMin!.PositionOffset, Def.RandMax!.PositionOffset) : Vector2.Zero)) * 4f,
             Def.Flicker,
             Def.Flip,
-            (OverrideDrawLayer ?? Def.SortOffset) + (Def.HasRand ? Random.Shared.NextSingle(Def.RandMin!.SortOffset, Def.RandMax!.SortOffset) : 0),
+            GetDrawLayerDepth(),
             Def.AlphaFade + (Def.HasRand ? Random.Shared.NextSingle(Def.RandMin!.AlphaFade, Def.RandMax!.AlphaFade) : 0),
             Utility.StringToColor(Def.Color) ?? Color.White,
             (Def.Scale + (Def.HasRand ? Random.Shared.NextSingle(Def.RandMin!.Scale, Def.RandMax!.Scale) : 0)) * 4f,
@@ -98,7 +110,6 @@ internal sealed record TASContext(TASExt Def)
         tas.scaleChangeChange = Def.HasRand ? Random.Shared.NextSingle(Def.RandMin!.ScaleChangeChange, Def.RandMax!.ScaleChangeChange) : 0;
         tas.pingPong = Def.PingPong;
         tas.alpha = Def.Alpha + (Def.HasRand ? Random.Shared.NextSingle(Def.RandMin!.Alpha, Def.RandMax!.Alpha) : 0);
-        tas.layerDepth = Def.LayerDepth ?? (Pos.Y + 0.66f * Game1.tileSize) / 10000f + Pos.X / Game1.tileSize * 1E-05f;
         tas.motion = Def.Motion + (Def.HasRand ? Random.Shared.NextVector2(Def.RandMin!.Motion, Def.RandMax!.Motion) : Vector2.Zero);
         tas.acceleration = Def.Acceleration + (Def.HasRand ? Random.Shared.NextVector2(Def.RandMin!.Acceleration, Def.RandMax!.Acceleration) : Vector2.Zero);
         tas.accelerationChange = Def.AccelerationChange + (Def.HasRand ? Random.Shared.NextVector2(Def.RandMin!.AccelerationChange, Def.RandMax!.AccelerationChange) : Vector2.Zero);
