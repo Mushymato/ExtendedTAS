@@ -1,6 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.Xna.Framework;
-using MiscMapActionsProperties;
 using StardewModdingAPI;
 using StardewModdingAPI.Events;
 using StardewValley;
