@@ -278,4 +278,15 @@ internal sealed class TASAssetManager
             }
         }
     }
+
+    public bool TryGetTASContext(string tasId, [NotNullWhen(true)] out TASContext? tasCtx)
+    {
+        if (TryGetTASExt(tasId, out TASExt? tasExt))
+        {
+            tasCtx = new(tasExt);
+            return true;
+        }
+        tasCtx = null;
+        return false;
+    }
 }
