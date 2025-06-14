@@ -1,10 +1,12 @@
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.Xna.Framework;
+using MiscMapActionsProperties;
 using StardewModdingAPI;
 using StardewModdingAPI.Events;
 using StardewValley;
 using StardewValley.Delegates;
 using StardewValley.GameData;
+using StardewValley.Triggers;
 
 namespace Mushymato.ExtendedTAS;
 
@@ -39,13 +41,16 @@ public sealed class TASExt : TemporaryAnimatedSpriteDefinition
     public Vector2 Acceleration = Vector2.Zero;
     public Vector2 AccelerationChange = Vector2.Zero;
     public float? LayerDepth = null;
-
-    // actually opacity
-    public float Alpha = 1f;
+    public float Alpha = 1f; // actually opacity
     public bool PingPong = false;
+
+    public List<string>? EndActions = null;
+    public bool ApplyEndActionsOnForceRemove = false;
+    internal CachedAction[]? cachedEndActions = null;
+    internal CachedAction[]? CachedEndActions => cachedEndActions ??= EndActions?.Select(TriggerActionManager.ParseAction).Where(cached => cached.Error == null).ToArray();
+
     public double SpawnInterval = -1;
     public int SpawnDelay = -1;
-
     public double ConditionInterval = -1;
 
     internal bool HasRand => RandMin != null && RandMax != null;
@@ -126,12 +131,38 @@ internal sealed record TASContext(TASExt Def)
         return false;
     }
 
+    internal void CallTASEndActions()
+    {
+        TriggerActionContext context = new();
+        foreach (CachedAction action in Def.CachedEndActions!)
+        {
+            if (!TriggerActionManager.TryRunAction(action, context, out string error, out Exception exception))
+            {
+                if (string.IsNullOrWhiteSpace(error))
+                {
+                    ModEntry.Log(error, LogLevel.Error);
+                }
+                else
+                {
+                    ModEntry.Log(exception.ToString(), LogLevel.Error);
+                }
+            }
+        }
+    }
+
+    internal TemporaryAnimatedSprite.endBehavior MakeTASEndFunction(TemporaryAnimatedSprite tas)
+    {
+        if (Def.CachedEndActions == null)
+            return (extraInfo) => Spawned.Remove(tas);
+        else
+            return (extraInfo) => { CallTASEndActions(); Spawned.Remove(tas); };
+    }
 
     internal bool TryCreate(GameStateQueryContext context, Action<TemporaryAnimatedSprite> addSprite)
     {
         if (TryCreateConditionally(context, out TemporaryAnimatedSprite? tas))
         {
-            tas.endFunction = (extraInfo) => Spawned.Remove(tas);
+            tas.endFunction = MakeTASEndFunction(tas);
             Spawned.Add(tas);
             addSprite(tas);
             return true;
@@ -146,7 +177,7 @@ internal sealed record TASContext(TASExt Def)
             DelayedAction.functionAfterDelay(
                 () =>
                 {
-                    tas.endFunction = (extraInfo) => Spawned.Remove(tas);
+                    tas.endFunction = MakeTASEndFunction(tas);
                     Spawned.Add(tas);
                     addSprite(tas);
                 },
@@ -189,7 +220,7 @@ internal sealed record TASContext(TASExt Def)
                 }
                 if (TryCreateConditionally(context, out TemporaryAnimatedSprite? tas))
                 {
-                    tas.endFunction = (extraInfo) => Spawned.Remove(tas);
+                    tas.endFunction = MakeTASEndFunction(tas);
                     Spawned.Add(tas);
                     addSprite(tas);
                     return true;
@@ -209,6 +240,9 @@ internal sealed record TASContext(TASExt Def)
     {
         foreach (TemporaryAnimatedSprite tas in Spawned)
         {
+            if (!Def.ApplyEndActionsOnForceRemove)
+                tas.endFunction = null;
+            tas.unload();
             removeSprite(tas);
         }
         Spawned.Clear();
