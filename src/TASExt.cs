@@ -244,6 +244,8 @@ internal sealed record TASContext(TASExt Def)
                 tas.endFunction = null;
             tas.unload();
             removeSprite(tas);
+            if (tas.Pooled)
+                tas.Pool();
         }
         Spawned.Clear();
     }
