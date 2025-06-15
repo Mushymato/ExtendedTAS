@@ -1,6 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.Xna.Framework;
-using MiscMapActionsProperties;
 using StardewModdingAPI;
 using StardewModdingAPI.Events;
 using StardewValley;
@@ -136,17 +135,7 @@ internal sealed record TASContext(TASExt Def)
         TriggerActionContext context = new();
         foreach (CachedAction action in Def.CachedEndActions!)
         {
-            if (!TriggerActionManager.TryRunAction(action, context, out string error, out Exception exception))
-            {
-                if (string.IsNullOrWhiteSpace(error))
-                {
-                    ModEntry.Log(error, LogLevel.Error);
-                }
-                else
-                {
-                    ModEntry.Log(exception.ToString(), LogLevel.Error);
-                }
-            }
+            TriggerActionManager.TryRunAction(action, context, out _, out _);
         }
     }
 
