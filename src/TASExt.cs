@@ -225,7 +225,7 @@ internal sealed record TASContext(TASExt Def)
         return false;
     }
 
-    internal void RemoveAllSpawned(Func<TemporaryAnimatedSprite, bool> removeSprite)
+    internal void RemoveAllSpawned(Func<TemporaryAnimatedSprite, bool> removeSprite, bool pool = false)
     {
         foreach (TemporaryAnimatedSprite tas in Spawned)
         {
@@ -233,7 +233,7 @@ internal sealed record TASContext(TASExt Def)
                 tas.endFunction = null;
             tas.unload();
             removeSprite(tas);
-            if (tas.Pooled)
+            if (pool && tas.Pooled)
                 tas.Pool();
         }
         Spawned.Clear();
