@@ -17,6 +17,7 @@ public sealed class TASExtRand
     public float SortOffset = 0f;
     public float Alpha = 0f;
     public float AlphaFade = 0f;
+    public float AlphaFadeFade = 0f;
     public float Scale = 0f;
     public float ScaleChange = 0f;
     public float ScaleChangeChange = 0f;
@@ -41,7 +42,9 @@ public sealed class TASExt : TemporaryAnimatedSpriteDefinition
     public Vector2 AccelerationChange = Vector2.Zero;
     public float? LayerDepth = null;
     public float Alpha = 1f; // actually opacity
+    public float AlphaFadeFade = 0f;
     public bool PingPong = false;
+    public bool DrawAboveAlwaysFront = false;
 
     public List<string>? EndActions = null;
     public bool ApplyEndActionsOnForceRemove = false;
@@ -110,12 +113,17 @@ internal sealed record TASContext(TASExt Def)
             (OverrideRotation ?? Def.Rotation) + (Def.HasRand ? Random.Shared.NextSingle(Def.RandMin!.Rotation, Def.RandMax!.Rotation) : 0),
             Def.RotationChange + (Def.HasRand ? Random.Shared.NextSingle(Def.RandMin!.RotationChange, Def.RandMax!.RotationChange) : 0)
         );
-        tas.scaleChangeChange = Def.HasRand ? Random.Shared.NextSingle(Def.RandMin!.ScaleChangeChange, Def.RandMax!.ScaleChangeChange) : 0;
-        tas.pingPong = Def.PingPong;
+
+        tas.scaleChangeChange = Def.ScaleChangeChange + (Def.HasRand ? Random.Shared.NextSingle(Def.RandMin!.ScaleChangeChange, Def.RandMax!.ScaleChangeChange) : 0);
         tas.alpha = Def.Alpha + (Def.HasRand ? Random.Shared.NextSingle(Def.RandMin!.Alpha, Def.RandMax!.Alpha) : 0);
+        tas.alphaFadeFade = Def.AlphaFadeFade + (Def.HasRand ? Random.Shared.NextSingle(Def.RandMin!.AlphaFadeFade, Def.RandMax!.AlphaFadeFade) : 0);
         tas.motion = Def.Motion + (Def.HasRand ? Random.Shared.NextVector2(Def.RandMin!.Motion, Def.RandMax!.Motion) : Vector2.Zero);
         tas.acceleration = Def.Acceleration + (Def.HasRand ? Random.Shared.NextVector2(Def.RandMin!.Acceleration, Def.RandMax!.Acceleration) : Vector2.Zero);
         tas.accelerationChange = Def.AccelerationChange + (Def.HasRand ? Random.Shared.NextVector2(Def.RandMin!.AccelerationChange, Def.RandMax!.AccelerationChange) : Vector2.Zero);
+
+        tas.pingPong = Def.PingPong;
+        tas.drawAboveAlwaysFront = Def.DrawAboveAlwaysFront;
+
         return tas;
     }
 
