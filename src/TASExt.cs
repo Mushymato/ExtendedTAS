@@ -45,6 +45,8 @@ public sealed class TASExt : TemporaryAnimatedSpriteDefinition
     public float AlphaFadeFade = 0f;
     public bool PingPong = false;
     public bool DrawAboveAlwaysFront = false;
+    public float LightRadius = 0;
+    public string? LightColor = null;
 
     public List<string>? EndActions = null;
     public bool ApplyEndActionsOnForceRemove = false;
@@ -120,6 +122,13 @@ internal sealed record TASContext(TASExt Def)
         tas.motion = Def.Motion + (Def.HasRand ? Random.Shared.NextVector2(Def.RandMin!.Motion, Def.RandMax!.Motion) : Vector2.Zero);
         tas.acceleration = Def.Acceleration + (Def.HasRand ? Random.Shared.NextVector2(Def.RandMin!.Acceleration, Def.RandMax!.Acceleration) : Vector2.Zero);
         tas.accelerationChange = Def.AccelerationChange + (Def.HasRand ? Random.Shared.NextVector2(Def.RandMin!.AccelerationChange, Def.RandMax!.AccelerationChange) : Vector2.Zero);
+        if (Def.LightRadius > 0)
+        {
+            tas.lightId = $"Mushymato.ExtendedTAS_Light_{Guid.NewGuid()}";
+            tas.lightRadius = Def.LightRadius;
+            Color lightColor = Utility.StringToColor(Def.LightColor) ?? Color.White;
+            tas.lightcolor = new(lightColor.PackedValue ^ 0x00FFFFFF);
+        }
 
         tas.pingPong = Def.PingPong;
         tas.drawAboveAlwaysFront = Def.DrawAboveAlwaysFront;
