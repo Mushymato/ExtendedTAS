@@ -219,7 +219,7 @@ internal sealed record TASContext(TASExt Def)
                             : 0
                     )
                 );
-                if (Def.ConditionInterval > 0 && GSQState != null && gsqTimeout <= TimeSpan.Zero)
+                if (Def.ConditionInterval > 0 && (GSQState != null || notSpawnedYet) && gsqTimeout <= TimeSpan.Zero)
                 {
                     gsqTimeout = TimeSpan.FromMilliseconds(Def.ConditionInterval);
                     GSQState = null;
