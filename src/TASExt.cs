@@ -136,6 +136,7 @@ internal sealed record TASContext(TASExt Def)
         return tas;
     }
 
+
     private bool TryCreateConditionally(GameStateQueryContext context, [NotNullWhen(true)] out TemporaryAnimatedSprite? tas)
     {
         if (GSQState ??= (GameStateQuery.CheckConditions(Def.Condition, context)))
@@ -145,6 +146,29 @@ internal sealed record TASContext(TASExt Def)
         }
         tas = null;
         return false;
+    }
+
+    private void AddWithOptionalDelay(Action<TemporaryAnimatedSprite> addSprite, TemporaryAnimatedSprite tas)
+    {
+        if (Def.SpawnDelay > 0)
+        {
+            DelayedAction.functionAfterDelay(
+                () =>
+                {
+                    tas.endFunction = MakeTASEndFunction(tas);
+                    Spawned.Add(tas);
+                    addSprite(tas);
+                },
+                Def.SpawnDelay
+                    + (Def.HasRand ? Random.Shared.Next(Def.RandMin!.SpawnDelay, Def.RandMax!.SpawnDelay) : 0)
+            );
+        }
+        else
+        {
+            tas.endFunction = MakeTASEndFunction(tas);
+            Spawned.Add(tas);
+            addSprite(tas);
+        }
     }
 
     internal void CallTASEndActions()
@@ -176,23 +200,34 @@ internal sealed record TASContext(TASExt Def)
         return false;
     }
 
-    internal bool TryCreateDelayed(GameStateQueryContext context, Action<TemporaryAnimatedSprite> addSprite)
+    internal bool TryCreateAllowDelay(GameStateQueryContext context, Action<TemporaryAnimatedSprite> addSprite)
     {
-        if (Def.SpawnDelay > 0 && TryCreateConditionally(context, out TemporaryAnimatedSprite? tas))
+        if (TryCreateConditionally(context, out TemporaryAnimatedSprite? tas))
         {
-            DelayedAction.functionAfterDelay(
-                () =>
-                {
-                    tas.endFunction = MakeTASEndFunction(tas);
-                    Spawned.Add(tas);
-                    addSprite(tas);
-                },
-                Def.SpawnDelay
-                    + (Def.HasRand ? Random.Shared.Next(Def.RandMin!.SpawnDelay, Def.RandMax!.SpawnDelay) : 0)
-            );
+            AddWithOptionalDelay(addSprite, tas);
             return true;
         }
         return false;
+    }
+
+    internal void RecheckStateThenCreateOrRemove(GameStateQueryContext context, Action<TemporaryAnimatedSprite> addSprite, Func<TemporaryAnimatedSprite, bool> removeSprite)
+    {
+        if (GSQState == null)
+            return;
+        bool previousState = GSQState.Value;
+        bool newState = GameStateQuery.CheckConditions(Def.Condition, context);
+        if (previousState == newState)
+            return;
+        GSQState = newState;
+        if (newState)
+        {
+            TemporaryAnimatedSprite tas = Create();
+            AddWithOptionalDelay(addSprite, tas);
+        }
+        else
+        {
+            RemoveAllSpawned(removeSprite);
+        }
     }
 
     internal bool TryCreateRespawning(
