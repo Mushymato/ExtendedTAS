@@ -23,10 +23,13 @@ public sealed class TASExtRand
     public float ScaleChangeChange = 0f;
     public float Rotation = 0f;
     public float RotationChange = 0f;
+    public float ShakeIntensity = 0f;
+    public float ShakeIntensityChange = 0f;
     public Vector2 Motion = Vector2.Zero;
     public Vector2 Acceleration = Vector2.Zero;
     public Vector2 AccelerationChange = Vector2.Zero;
     public Vector2 PositionOffset = Vector2.Zero;
+    public int DelayBeforeAnimationStart = 0;
     public double SpawnInterval = 0;
     public int SpawnDelay = 0;
 }
@@ -47,12 +50,19 @@ public sealed class TASExt : TemporaryAnimatedSpriteDefinition
     public bool DrawAboveAlwaysFront = false;
     public float LightRadius = 0;
     public string? LightColor = null;
+    public string? StartSound = null;
+    public string? EndSound = null;
+    public float ShakeIntensity = 0f;
+    public float ShakeIntensityChange = 0f;
 
     public List<string>? EndActions = null;
     public bool ApplyEndActionsOnForceRemove = false;
     internal CachedAction[]? cachedEndActions = null;
     internal CachedAction[]? CachedEndActions => cachedEndActions ??= EndActions?.Select(TriggerActionManager.ParseAction).Where(cached => cached.Error == null).ToArray();
 
+    public List<string>? FollowingTAS = null;
+
+    public int DelayBeforeAnimationStart = 0;
     public double SpawnInterval = -1;
     public int SpawnDelay = -1;
     public double ConditionInterval = -1;
@@ -83,6 +93,7 @@ internal sealed record TASContext(TASExt Def)
     internal float? OverrideRotation = null;
 
     internal HashSet<TemporaryAnimatedSprite> Spawned = [];
+    internal Dictionary<string, TASContext?> followingTASCtx = [];
 
     internal bool? GSQState = null;
 
@@ -90,7 +101,7 @@ internal sealed record TASContext(TASExt Def)
     {
         float layerDepth = OverrideDrawLayer ?? Def.LayerDepth ?? 0f;
         float SortOffset = Def.SortOffset + (Def.HasRand ? Random.Shared.NextSingle(Def.RandMin!.SortOffset, Def.RandMax!.SortOffset) : 0);
-        if (SortOffset > 0)
+        if (SortOffset != 0)
             layerDepth += (Pos.Y + SortOffset) / 10000f + Pos.X / Game1.tileSize * LAYER_OFFSET;
         return layerDepth;
     }
@@ -122,6 +133,9 @@ internal sealed record TASContext(TASExt Def)
         tas.motion = Def.Motion + (Def.HasRand ? Random.Shared.NextVector2(Def.RandMin!.Motion, Def.RandMax!.Motion) : Vector2.Zero);
         tas.acceleration = Def.Acceleration + (Def.HasRand ? Random.Shared.NextVector2(Def.RandMin!.Acceleration, Def.RandMax!.Acceleration) : Vector2.Zero);
         tas.accelerationChange = Def.AccelerationChange + (Def.HasRand ? Random.Shared.NextVector2(Def.RandMin!.AccelerationChange, Def.RandMax!.AccelerationChange) : Vector2.Zero);
+        tas.shakeIntensity = Def.ShakeIntensity + (Def.HasRand ? Random.Shared.NextSingle(Def.RandMin!.ShakeIntensity, Def.RandMax!.ShakeIntensity) : 0);
+        tas.shakeIntensityChange = Def.ShakeIntensityChange + (Def.HasRand ? Random.Shared.NextSingle(Def.RandMin!.ShakeIntensityChange, Def.RandMax!.ShakeIntensityChange) : 0);
+        tas.delayBeforeAnimationStart = Def.DelayBeforeAnimationStart + (Def.HasRand ? Random.Shared.Next(Def.RandMin!.DelayBeforeAnimationStart, Def.RandMax!.DelayBeforeAnimationStart) : 0);
         if (Def.LightRadius > 0)
         {
             tas.lightId = $"Mushymato.ExtendedTAS_Light_{Guid.NewGuid()}";
@@ -132,6 +146,8 @@ internal sealed record TASContext(TASExt Def)
 
         tas.pingPong = Def.PingPong;
         tas.drawAboveAlwaysFront = Def.DrawAboveAlwaysFront;
+        tas.startSound = Def.StartSound;
+        tas.endSound = Def.EndSound;
 
         return tas;
     }
@@ -148,14 +164,14 @@ internal sealed record TASContext(TASExt Def)
         return false;
     }
 
-    private void AddWithOptionalDelay(Action<TemporaryAnimatedSprite> addSprite, TemporaryAnimatedSprite tas)
+    private void AddWithOptionalDelay(TemporaryAnimatedSprite tas, GameStateQueryContext context, Action<TemporaryAnimatedSprite> addSprite)
     {
         if (Def.SpawnDelay > 0)
         {
             DelayedAction.functionAfterDelay(
                 () =>
                 {
-                    tas.endFunction = MakeTASEndFunction(tas);
+                    tas.endFunction = MakeTASEndFunction(tas, context, addSprite);
                     Spawned.Add(tas);
                     addSprite(tas);
                 },
@@ -165,7 +181,7 @@ internal sealed record TASContext(TASExt Def)
         }
         else
         {
-            tas.endFunction = MakeTASEndFunction(tas);
+            tas.endFunction = MakeTASEndFunction(tas, context, addSprite);
             Spawned.Add(tas);
             addSprite(tas);
         }
@@ -173,26 +189,47 @@ internal sealed record TASContext(TASExt Def)
 
     internal void CallTASEndActions()
     {
+        if (Def.CachedEndActions == null)
+            return;
         TriggerActionContext context = new();
-        foreach (CachedAction action in Def.CachedEndActions!)
+        foreach (CachedAction action in Def.CachedEndActions)
         {
             TriggerActionManager.TryRunAction(action, context, out _, out _);
         }
     }
 
-    internal TemporaryAnimatedSprite.endBehavior MakeTASEndFunction(TemporaryAnimatedSprite tas)
+    internal void SpawnFollowingTAS(TemporaryAnimatedSprite tas, GameStateQueryContext context, Action<TemporaryAnimatedSprite> addSprite)
     {
-        if (Def.CachedEndActions == null)
+        if (Def.FollowingTAS == null)
+            return;
+        foreach (string tasId in Def.FollowingTAS)
+        {
+            if (!followingTASCtx.TryGetValue(tasId, out TASContext? tasCtx))
+            {
+                TASAssetManager.TAS.TryGetTASContext(tasId, out tasCtx);
+                followingTASCtx[tasId] = tasCtx;
+            }
+            if (tasCtx != null)
+            {
+                tasCtx.Pos = tas.Position;
+                tasCtx?.TryCreateAllowDelay(context, addSprite);
+            }
+        }
+    }
+
+    internal TemporaryAnimatedSprite.endBehavior MakeTASEndFunction(TemporaryAnimatedSprite tas, GameStateQueryContext context, Action<TemporaryAnimatedSprite> addSprite)
+    {
+        if (Def.CachedEndActions == null && Def.FollowingTAS == null)
             return (extraInfo) => Spawned.Remove(tas);
         else
-            return (extraInfo) => { CallTASEndActions(); Spawned.Remove(tas); };
+            return (extraInfo) => { SpawnFollowingTAS(tas, context, addSprite); CallTASEndActions(); Spawned.Remove(tas); };
     }
 
     internal bool TryCreate(GameStateQueryContext context, Action<TemporaryAnimatedSprite> addSprite)
     {
         if (TryCreateConditionally(context, out TemporaryAnimatedSprite? tas))
         {
-            tas.endFunction = MakeTASEndFunction(tas);
+            tas.endFunction = MakeTASEndFunction(tas, context, addSprite);
             Spawned.Add(tas);
             addSprite(tas);
             return true;
@@ -204,7 +241,7 @@ internal sealed record TASContext(TASExt Def)
     {
         if (TryCreateConditionally(context, out TemporaryAnimatedSprite? tas))
         {
-            AddWithOptionalDelay(addSprite, tas);
+            AddWithOptionalDelay(tas, context, addSprite);
             return true;
         }
         return false;
@@ -222,7 +259,7 @@ internal sealed record TASContext(TASExt Def)
         if (newState)
         {
             TemporaryAnimatedSprite tas = Create();
-            AddWithOptionalDelay(addSprite, tas);
+            AddWithOptionalDelay(tas, context, addSprite);
         }
         else
         {
@@ -261,7 +298,7 @@ internal sealed record TASContext(TASExt Def)
                 }
                 if (TryCreateConditionally(context, out TemporaryAnimatedSprite? tas))
                 {
-                    tas.endFunction = MakeTASEndFunction(tas);
+                    tas.endFunction = MakeTASEndFunction(tas, context, addSprite);
                     Spawned.Add(tas);
                     addSprite(tas);
                     return true;
@@ -289,6 +326,10 @@ internal sealed record TASContext(TASExt Def)
                 tas.Pool();
         }
         Spawned.Clear();
+        foreach (TASContext? followingCtx in followingTASCtx.Values)
+        {
+            followingCtx?.RemoveAllSpawned(removeSprite, pool);
+        }
     }
 }
 
@@ -298,15 +339,22 @@ internal sealed record TASContext(TASExt Def)
 /// </summary>
 internal sealed class TASAssetManager
 {
+    internal static TASAssetManager TAS = null!;
     private readonly string assetName;
     private readonly IModHelper helper;
     internal string AssetName => assetName;
-    internal TASAssetManager(IModHelper helper, string assetName)
+    private TASAssetManager(IModHelper helper, string assetName)
     {
         this.helper = helper;
         this.helper.Events.Content.AssetRequested += OnAssetRequested;
         this.helper.Events.Content.AssetsInvalidated += OnAssetInvalidated;
         this.assetName = assetName;
+    }
+
+    internal static TASAssetManager Make(IModHelper helper, string assetName)
+    {
+        TAS ??= new(helper, assetName);
+        return TAS;
     }
 
     private Dictionary<string, TASExt>? _tasData = null;
