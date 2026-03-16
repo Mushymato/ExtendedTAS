@@ -25,6 +25,12 @@ public sealed class TASExtRand
     public float RotationChange = 0f;
     public float ShakeIntensity = 0f;
     public float ShakeIntensityChange = 0f;
+    public bool XPeriodic = false;
+    public float XPeriodicRange = 0f;
+    public float XPeriodicLoopTime = 0f;
+    public bool YPeriodic = false;
+    public float YPeriodicRange = 0f;
+    public float YPeriodicLoopTime = 0f;
     public Vector2 Motion = Vector2.Zero;
     public Vector2 Acceleration = Vector2.Zero;
     public Vector2 AccelerationChange = Vector2.Zero;
@@ -54,6 +60,12 @@ public sealed class TASExt : TemporaryAnimatedSpriteDefinition
     public string? EndSound = null;
     public float ShakeIntensity = 0f;
     public float ShakeIntensityChange = 0f;
+    public bool XPeriodic = false;
+    public float XPeriodicRange = 0f;
+    public float XPeriodicLoopTime = 0f;
+    public bool YPeriodic = false;
+    public float YPeriodicRange = 0f;
+    public float YPeriodicLoopTime = 0f;
 
     public List<string>? EndActions = null;
     public bool ApplyEndActionsOnForceRemove = false;
@@ -142,6 +154,18 @@ internal sealed record TASContext(TASExt Def)
             tas.lightRadius = Def.LightRadius;
             Color lightColor = Utility.StringToColor(Def.LightColor) ?? Color.White;
             tas.lightcolor = new(lightColor.PackedValue ^ 0x00FFFFFF);
+        }
+        if (Def.XPeriodic)
+        {
+            tas.xPeriodic = true;
+            tas.xPeriodicRange = Def.XPeriodicRange + (Def.HasRand ? Random.Shared.NextSingle(Def.RandMin!.XPeriodicRange, Def.RandMax!.XPeriodicRange) : 0);
+            tas.xPeriodicLoopTime = Def.XPeriodicLoopTime + (Def.HasRand ? Random.Shared.NextSingle(Def.RandMin!.XPeriodicLoopTime, Def.RandMax!.XPeriodicLoopTime) : 0);
+        }
+        if (Def.YPeriodic)
+        {
+            tas.yPeriodic = true;
+            tas.yPeriodicRange = Def.YPeriodicRange + (Def.HasRand ? Random.Shared.NextSingle(Def.RandMin!.YPeriodicRange, Def.RandMax!.YPeriodicRange) : 0);
+            tas.yPeriodicLoopTime = Def.YPeriodicLoopTime + (Def.HasRand ? Random.Shared.NextSingle(Def.RandMin!.YPeriodicLoopTime, Def.RandMax!.YPeriodicLoopTime) : 0);
         }
 
         tas.pingPong = Def.PingPong;
