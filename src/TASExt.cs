@@ -151,6 +151,7 @@ internal sealed record TASContext(TASExt Def)
         if (Def.LightRadius > 0)
         {
             tas.lightId = $"Mushymato.ExtendedTAS_Light_{Guid.NewGuid()}";
+            tas.hasLit = false;
             tas.lightRadius = Def.LightRadius;
             Color lightColor = Utility.StringToColor(Def.LightColor) ?? Color.White;
             tas.lightcolor = new(lightColor.PackedValue ^ 0x00FFFFFF);
@@ -346,8 +347,6 @@ internal sealed record TASContext(TASExt Def)
                 tas.endFunction = null;
             tas.unload();
             removeSprite(tas);
-            if (tas.Pooled)
-                tas.Pool();
         }
         Spawned.Clear();
         foreach (TASContext? followingCtx in followingTASCtx.Values)
